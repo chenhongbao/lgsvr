@@ -59,7 +59,7 @@ public class LoggingDbAdaptor implements Runnable {
 	String _URL, _Username, _Password, _ConnStr;
 
 	/*数据库和执行语句*/
-	Connection _DbConnection;
+	Connection _DbConnection = null;
 	PreparedStatement _Statement = null;
 
 	/*循环是否退出*/
