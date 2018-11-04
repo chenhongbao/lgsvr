@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONObject;
 
-import com.logging.lgsvr.Common;
+import com.Common;
 
 public class LoggingDbAdaptor implements Runnable {
 

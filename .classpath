@@ -2,7 +2,7 @@
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="lib/json-java-20180830.jar" sourcepath="D:/Workspace/eclipse/json_java/src"/>
 	<classpathentry kind="lib" path="lib/mysql-connector-java-8.0.12.jar" sourcepath="D:/Program Files/mysql-connector-java-8.0.12/src"/>
+	<classpathentry kind="lib" path="lib/common.jar" sourcepath="D:/Workspace/oepe/logsvr/lib/common.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
