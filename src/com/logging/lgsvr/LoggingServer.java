@@ -41,6 +41,7 @@ public class LoggingServer implements Runnable {
 			try {
 				Result r = _tcp.Recv(bytes);
 				if (r.equals(Result.Error) || bytes.size() < 1) {
+					Common.PrintException("½ÓÊÕ´íÎó£¬" + r.Message);
 					continue;
 				}
 				if (bytes.size() > buffer_len) {
