@@ -1,9 +1,5 @@
 package com.logging.lgsvr;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -67,21 +63,12 @@ public class LoggingServer implements Runnable {
 
 	public static void main(String[] args) {
 		int port = DEFAULT_PORT;
-		String file = null;
 		LoggingDbAdaptor adaptor = null;
 		ExecutorService es = Executors.newCachedThreadPool();
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
-			file = Class.forName(traces[1].getClassName()).getResource("port.json").getFile();
-			BufferedReader br = new BufferedReader(
-					new FileReader(new File(file)));
-			String line = null;
-			StringBuilder sb = new StringBuilder();
-			while ((line = br.readLine()) != null) {
-				sb.append(line);
-			}
-			br.close();
-			JSONObject ob = new JSONObject(sb.toString());
+			InputStream is = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
+			JSONObject ob = Common.LoadJSONObject(is);
 			if (ob.has("Port")) {
 				port = ob.getInt("Port");
 			}
@@ -91,6 +78,7 @@ public class LoggingServer implements Runnable {
 			/*执行数据库伴随线程*/
 			adaptor = new LoggingDbAdaptor();
 			es.execute(adaptor);
+			System.out.println("日志服务器启动，在端口" + port + "监听。");
 			while (true) {
 				Socket client = ss.accept();
 				client.setOOBInline(false);

@@ -1,8 +1,6 @@
 package com.logging.lgsvr.db;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -104,15 +102,8 @@ public class LoggingDbAdaptor implements Runnable {
 	}
 
 	private void _LoadConfiguration() throws Exception {
-		BufferedReader br = new BufferedReader(
-				new FileReader(new File(this.getClass().getResource("dblogin.json").getFile())));
-		String line = null;
-		StringBuilder sb = new StringBuilder();
-		while ((line = br.readLine()) != null) {
-			sb.append(line);
-		}
-		br.close();
-		JSONObject obj = new JSONObject(sb.toString());
+		InputStream is = this.getClass().getResource("dblogin.json").openStream();
+		JSONObject obj = Common.LoadJSONObject(is);
 		if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
 			_URL = obj.getString("URL");
 			_Username = obj.getString("Username");
