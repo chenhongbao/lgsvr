@@ -40,9 +40,10 @@ public class LoggingServer implements Runnable {
 		while (true) {
 			try {
 				Result r = _tcp.Recv(bytes);
-				if (r.equals(Result.Error) || bytes.size() < 1) {
+				if (r.equals(Result.Error)) {
 					Common.PrintException("接收错误，" + r.Message);
-					continue;
+					/*当客户端断开连接，这里始终会抛出异常发生错误，因此必须退出循环，线程退出。否则会不断死循环地抛异常。*/
+					break;
 				}
 				if (bytes.size() > buffer_len) {
 					buffer_len = bytes.size() * 2;
