@@ -1,4 +1,4 @@
-package com.logging.lgsvr.db;
+package com.logging.svr.db;
 
 import java.io.InputStream;
 import java.sql.Connection;

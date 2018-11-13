@@ -1,4 +1,4 @@
-package com.logging.lgsvr;
+package com.logging.svr;
 
 import java.io.InputStream;
 import java.net.ServerSocket;
@@ -11,8 +11,8 @@ import org.json.JSONObject;
 
 import com.Common;
 import com.Result;
-import com.logging.lgsvr.db.LoggingDbAdaptor;
-import com.logging.lgsvr.db.LoggingDbAdaptor.SingleLog;
+import com.logging.svr.db.LoggingDbAdaptor;
+import com.logging.svr.db.LoggingDbAdaptor.SingleLog;
 import com.net.TcpPoint;
 
 public class LoggingServer implements Runnable {
