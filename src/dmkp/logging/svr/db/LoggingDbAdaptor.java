@@ -1,4 +1,4 @@
-package com.logging.svr.db;
+package dmkp.logging.svr.db;
 
 import java.io.InputStream;
 import java.sql.Connection;
@@ -10,11 +10,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONObject;
 
-import com.Common;
+import dmkp.common.util.Common;
 
 public class LoggingDbAdaptor implements Runnable {
 
 	public static class SingleLog {
+		public String TimeStamp = "";
 		public String Level = "";
 		public String LoggerName = "";
 		public String Message = "";
@@ -38,6 +39,7 @@ public class LoggingDbAdaptor implements Runnable {
 						&& obj.has("Message") && obj.has("Millis") 
 						&& obj.has("SourceClassName") && obj.has("SourceMethodName")) {
 					log = new SingleLog();
+					log.TimeStamp = obj.getString("TimeStamp");
 					log.Level = obj.getString("Level");
 					log.LoggerName = obj.getString("LoggerName");
 					log.Message = obj.getString("Message");
@@ -68,7 +70,7 @@ public class LoggingDbAdaptor implements Runnable {
 
 	/*每隔若干日志写数据库一次，避免过大内存消耗*/
 	public static long _QueryPerBatch = 500;
-	public static String _InsertSql = "INSERT INTO `loggingdb`.`log_ws_01` values (?,?,?,?,?,?)";
+	public static String _InsertSql = "INSERT INTO `loggingdb`.`log_ws_01` values (?,?,?,?,?,?,?)";
 
 	public LoggingDbAdaptor() throws Exception {
 		_Stopped = new AtomicBoolean(true);
@@ -143,12 +145,13 @@ public class LoggingDbAdaptor implements Runnable {
 			if (log == null) {
 				continue;
 			}
-			_Statement.setString(1, log.Level);
-			_Statement.setString(2, log.LoggerName);
-			_Statement.setString(3, log.Message);
-			_Statement.setLong(4, log.Millis);
-			_Statement.setString(5, log.SourceClassName);
-			_Statement.setString(6, log.SourceMethodName);
+			_Statement.setString(1,  log.TimeStamp);
+			_Statement.setString(2, log.Level);
+			_Statement.setString(3, log.LoggerName);
+			_Statement.setString(4, log.Message);
+			_Statement.setLong(5, log.Millis);
+			_Statement.setString(6, log.SourceClassName);
+			_Statement.setString(7, log.SourceMethodName);
 			_Statement.addBatch();
 			/* 如果数量超过若干，则提交以避免内存过度消耗 */
 			if (++count % _QueryPerBatch == 0) {

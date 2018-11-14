@@ -3,6 +3,7 @@ CREATE DATABASE loggingdb
     COLLATE utf8mb4_unicode_ci;
     
 CREATE TABLE log_ws_01 (
+	`TimeStamp` CHAR(255) COMMENT 'Time stamp for the logging',
 	`Level` CHAR(255) COMMENT 'Logging level used by java.util.logging.Logger',
     `LoggerName` CHAR(255) COMMENT 'Logger name used by java.utl.logging.Logger',
     `Message` TINYTEXT COMMENT 'Logging message sent by java.util.logging.Logger, utf-8',
