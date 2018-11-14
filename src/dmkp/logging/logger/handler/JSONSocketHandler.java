@@ -1,4 +1,4 @@
-package dmkp.logging.handler;
+package dmkp.logging.logger.handler;
 
 import java.io.File;
 import java.io.IOException;
