@@ -38,6 +38,11 @@ public class JSONSocketHandler extends Handler {
 			obj.put("Millis", record.getMillis());
 			obj.put("SourceClassName", record.getSourceClassName());
 			obj.put("SourceMethodName", record.getSourceMethodName());
+			/*
+			 * 因为获取行号需要JVM的栈信息，而从LogRecord传递行号则需要构造Throwable对象，开销非常大。
+			 * 所以这里默认提供零。
+			 */
+			obj.put("LineNumber", 0);
 			return obj.toString(0);
 		}
 	}

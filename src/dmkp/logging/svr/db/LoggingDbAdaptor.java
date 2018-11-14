@@ -22,6 +22,7 @@ public class LoggingDbAdaptor implements Runnable {
 		public long Millis = -1;
 		public String SourceClassName = "";
 		public String SourceMethodName = "";
+		public int LineNumber = -1;
 
 		SingleLog() {
 		}
@@ -35,18 +36,15 @@ public class LoggingDbAdaptor implements Runnable {
 			SingleLog log = null;
 			try {
 				JSONObject obj = new JSONObject(text);
-				if (obj.has("Level") && obj.has("LoggerName") 
-						&& obj.has("Message") && obj.has("Millis") 
-						&& obj.has("SourceClassName") && obj.has("SourceMethodName")) {
-					log = new SingleLog();
-					log.TimeStamp = obj.getString("TimeStamp");
-					log.Level = obj.getString("Level");
-					log.LoggerName = obj.getString("LoggerName");
-					log.Message = obj.getString("Message");
-					log.Millis = obj.getLong("Millis");
-					log.SourceClassName = obj.getString("SourceClassName");
-					log.SourceMethodName = obj.getString("SourceMethodName");
-				}
+				log = new SingleLog();
+				log.TimeStamp = obj.getString("TimeStamp");
+				log.Level = obj.getString("Level");
+				log.LoggerName = obj.getString("LoggerName");
+				log.Message = obj.getString("Message");
+				log.Millis = obj.getLong("Millis");
+				log.SourceClassName = obj.getString("SourceClassName");
+				log.SourceMethodName = obj.getString("SourceMethodName");
+				log.LineNumber = obj.getInt("LineNumber");
 				return log;
 			} catch (Exception e) {
 				Common.PrintException(e);
@@ -70,7 +68,7 @@ public class LoggingDbAdaptor implements Runnable {
 
 	/*每隔若干日志写数据库一次，避免过大内存消耗*/
 	public static long _QueryPerBatch = 500;
-	public static String _InsertSql = "INSERT INTO `loggingdb`.`log_ws_01` values (?,?,?,?,?,?,?)";
+	public static String _InsertSql = "INSERT INTO `loggingdb`.`log_ws_01` values (?,?,?,?,?,?,?,?)";
 
 	public LoggingDbAdaptor() throws Exception {
 		_Stopped = new AtomicBoolean(true);
@@ -152,8 +150,11 @@ public class LoggingDbAdaptor implements Runnable {
 			_Statement.setLong(5, log.Millis);
 			_Statement.setString(6, log.SourceClassName);
 			_Statement.setString(7, log.SourceMethodName);
+			_Statement.setInt(8, log.LineNumber);
 			_Statement.addBatch();
-			/* 如果数量超过若干，则提交以避免内存过度消耗 */
+			/*
+			 * 如果数量超过若干，则提交以避免内存过度消耗 
+			 */
 			if (++count % _QueryPerBatch == 0) {
 				_Statement.executeBatch();
 				_DbConnection.commit();

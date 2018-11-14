@@ -10,6 +10,8 @@ CREATE TABLE log_ws_01 (
     `Millis` BIGINT NOT NULL COMMENT 'Logging time in milliseconds since 1970',
     `SourceClassName` CHAR(255) NOT NULL COMMENT 'Class that sent the log',
     `SourceMethodName` CHAR(255) NOT NULL COMMENT 'Method that sent the log',
-    KEY BTREEHASH(`Millis`),
-    KEY HASH(`SourceClassName`, `SourceMethodName`)
+    `LineNumber` INT NOT NULL COMMENT 'Line number of code generating the log',
+    KEY (`Millis`),
+    KEY (`SourceClassName`),
+    KEY (`SourceMethodName`)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
