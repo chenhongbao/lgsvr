@@ -54,7 +54,7 @@ public class LoggingDbAdaptor implements Runnable {
 	}
 
 	/*从资源文件JSON中读取数据库登陆信息*/
-	String _URL, _Username, _Password, _ConnStr;
+	String _URL, _Username, _Password, _Table, _ConnStr, _InsertSQL;
 
 	/*数据库和执行语句*/
 	Connection _DbConnection = null;
@@ -68,7 +68,6 @@ public class LoggingDbAdaptor implements Runnable {
 
 	/*每隔若干日志写数据库一次，避免过大内存消耗*/
 	public static long _QueryPerBatch = 500;
-	public static String _InsertSql = "INSERT INTO `loggingdb`.`log_ws_01` values (?,?,?,?,?,?,?,?)";
 
 	public LoggingDbAdaptor() throws Exception {
 		_Stopped = new AtomicBoolean(true);
@@ -108,6 +107,7 @@ public class LoggingDbAdaptor implements Runnable {
 			_URL = obj.getString("URL");
 			_Username = obj.getString("Username");
 			_Password = obj.getString("Password");
+			_Table = obj.getString("Table");
 			_ConnStr = _URL
 					+ "?characterEncoding=utf8&useSSL=false"
 					+ "&serverTimezone=UTC&rewriteBatchedStatements=true";
@@ -124,7 +124,8 @@ public class LoggingDbAdaptor implements Runnable {
 			_DbConnection = DriverManager.getConnection(_ConnStr, _Username, _Password);
 		}
 		if (_Statement == null || _Statement.isClosed()) {
-			_Statement = _DbConnection.prepareStatement(_InsertSql);
+			_InsertSQL = "INSERT INTO `" + _Table + "` values (?,?,?,?,?,?,?,?)";
+			_Statement = _DbConnection.prepareStatement(_InsertSQL);
 		}
 		if (_DbConnection.getAutoCommit()) {
 			_DbConnection.setAutoCommit(false);
