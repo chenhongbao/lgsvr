@@ -1,8 +1,8 @@
 package dmkp.logging.logger.handler;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.util.logging.ErrorManager;
 import java.util.logging.Formatter;
@@ -13,7 +13,7 @@ import org.json.JSONObject;
 
 import dmkp.common.util.Common;
 import dmkp.common.util.Result;
-import dmkp.common.net.TcpPoint;
+import dmkp.common.net.SocketDuplex;
 
 public class JSONSocketHandler extends Handler {
 
@@ -65,13 +65,34 @@ public class JSONSocketHandler extends Handler {
 		
 	}
 	
-	private TcpPoint _tcp;
+	class SocketDuplexConn extends SocketDuplex {
+
+		@Override
+		public void OnConnect() {		
+		}
+
+		@Override
+		public void OnStream(byte[] Data) {
+		}
+
+		@Override
+		public void OnDisconnect() {
+			InetSocketAddress sa = (InetSocketAddress)GetSocketAddress();
+			Common.PrintException("日志服务器连接断开，" + sa.getAddress().getCanonicalHostName() + ":" + sa.getPort());
+		}
+
+		@Override
+		public void OnHearbeatError(Result Reason) {
+		}
+	}
+	
+	private SocketDuplex _tcp;
 
 	public JSONSocketHandler() {
 	}
 
 	public JSONSocketHandler(String host, int port) {
-		_tcp = new TcpPoint();
+		_tcp = new SocketDuplexConn();
 		Result r = _tcp.Connect(host, port);
 		if (r.equals(Result.Error)) {
 			Common.PrintException(new Exception("连接日志出错，" + r.Message));
@@ -91,7 +112,7 @@ public class JSONSocketHandler extends Handler {
 			return;
 		}
 		String msg = getFormatter().format(record);
-		Result r = _tcp.Send(msg.getBytes(Charset.forName(getEncoding())));
+		Result r = _tcp.SendStream(msg.getBytes(Charset.forName(getEncoding())));
 		if (r.equals(Result.Error)) {
 			Common.PrintException(new Exception("发送日志出错，" + r.Message));
 		}
@@ -103,10 +124,9 @@ public class JSONSocketHandler extends Handler {
 
 	@Override
 	public void close() throws SecurityException {
-		try {
-			_tcp.Close();
-		} catch (IOException e) {
-			Common.PrintException(new Exception("关闭日志网络连接出错，" + e.getMessage()));
+		Result r = _tcp.Disconnect();
+		if (r.equals(Result.Error)) {
+			Common.PrintException(new Exception("关闭日志网络连接出错，" + r.Message));
 		}
 	}
 }

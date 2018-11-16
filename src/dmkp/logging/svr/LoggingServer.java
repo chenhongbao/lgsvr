@@ -11,13 +11,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.json.JSONObject;
 
-import dmkp.common.net.Duplex;
+import dmkp.common.net.SocketDuplex;
 import dmkp.common.util.Common;
 import dmkp.common.util.Result;
 import dmkp.logging.svr.db.LoggingDbAdaptor;
 import dmkp.logging.svr.db.LoggingDbAdaptor.SingleLog;
 
-public class LoggingServer extends Duplex {
+public class LoggingServer extends SocketDuplex {
 
 	
 	/*数据库伴随线程*/
