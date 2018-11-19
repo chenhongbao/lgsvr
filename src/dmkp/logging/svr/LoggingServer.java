@@ -5,8 +5,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.json.JSONObject;
@@ -64,7 +62,6 @@ public class LoggingServer extends SocketDuplex {
 	public static void main(String[] args) {
 		int port = DEFAULT_PORT;
 		LoggingDbAdaptor adaptor = null;
-		ExecutorService es = Executors.newCachedThreadPool();
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
 			InputStream is = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
@@ -77,7 +74,7 @@ public class LoggingServer extends SocketDuplex {
 			ServerSocket ss = new ServerSocket(port);
 			/*执行数据库伴随线程*/
 			adaptor = new LoggingDbAdaptor();
-			es.execute(adaptor);
+			Common.GetSingletonExecSvc().execute(adaptor);
 			System.out.println("日志服务器启动，在端口" + port + "监听。");
 			while (true) {
 				Socket client = ss.accept();
