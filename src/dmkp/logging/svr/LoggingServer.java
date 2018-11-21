@@ -72,17 +72,23 @@ public class LoggingServer extends SocketDuplex {
 			/*服务socket永远不会退出*/
 			@SuppressWarnings("resource")
 			ServerSocket ss = new ServerSocket(port);
+			
 			/*执行数据库伴随线程*/
-			adaptor = new LoggingDbAdaptor();
+			adaptor = LoggingDbAdaptor.CreateSingleton();
 			Common.GetSingletonExecSvc().execute(adaptor);
+			
+			/*监听端口*/
 			System.out.println("日志服务器启动，在端口" + port + "监听。");
 			while (true) {
+				/*接收连接*/
 				Socket client = ss.accept();
 				client.setOOBInline(false);
+				
 				/*同步*/
 				_lock.writeLock().lock();
 				servers.add(new LoggingServer(client, adaptor));
 				_lock.writeLock().unlock();
+				
 				/*检查所有连接是否合法，不合法的删除*/
 				Set<LoggingServer> tmp = new HashSet<LoggingServer>();
 				_lock.readLock().lock();

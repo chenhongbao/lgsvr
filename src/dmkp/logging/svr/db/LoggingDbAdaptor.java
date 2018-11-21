@@ -68,8 +68,22 @@ public class LoggingDbAdaptor implements Runnable {
 
 	/*每隔若干日志写数据库一次，避免过大内存消耗*/
 	public static long _QueryPerBatch = 500;
+	
+	/*单件*/
+	static LoggingDbAdaptor _Adaptor;
+	static {
+		try {
+			_Adaptor = new LoggingDbAdaptor();
+		} catch (Exception e) {
+			Common.PrintException(e);
+		}
+	}
+	
+	public static LoggingDbAdaptor CreateSingleton() {
+		return _Adaptor;
+	}
 
-	public LoggingDbAdaptor() throws Exception {
+	protected LoggingDbAdaptor() throws Exception {
 		_Stopped = new AtomicBoolean(true);
 		_LogQueue = new ConcurrentLinkedQueue<SingleLog>();
 		_LoadConfiguration();
