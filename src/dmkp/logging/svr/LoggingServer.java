@@ -21,8 +21,7 @@ public class LoggingServer extends SocketDuplex {
 	/*数据库伴随线程*/
 	LoggingDbAdaptor _Adaptor;
 
-	public static int DEFAULT_PORT = 9200;
-	public static int DEFAULT_BUFFER = 8096;
+	public static int DEFAULT_PORT = 9201;
 
 	public LoggingServer(Socket Sock, LoggingDbAdaptor Adaptor) {
 		super(Sock);
