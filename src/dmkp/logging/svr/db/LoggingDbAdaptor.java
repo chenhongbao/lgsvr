@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -69,6 +70,10 @@ public class LoggingDbAdaptor implements Runnable {
 	/*每隔若干日志写数据库一次，避免过大内存消耗*/
 	public static long _QueryPerBatch = 500;
 	
+	/*上次操作数据库的毫秒数，超过一定时间自动重新连接数据库*/
+	long _LastAccessDB = 0;
+	public static long _ReconnectMillis = 1000 * 60 * 60;
+	
 	/*单件*/
 	static LoggingDbAdaptor _Adaptor;
 	static {
@@ -128,22 +133,40 @@ public class LoggingDbAdaptor implements Runnable {
 		}
 		Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
 	}
-
-	private void _ConnectDatabase() throws Exception {
+	
+	private void _ConnectDatabase() throws SQLException {
+		/*检查上次数据库操作时间，如果可能超时则重连数据库*/
+		long cur = System.currentTimeMillis();
+		if (cur - _LastAccessDB > _ReconnectMillis) {
+			_ResetDatabase();
+			_LastAccessDB = cur;
+			return;
+		}
+	}
+	
+	private void _ResetDatabase() throws SQLException {
 		if (_DbConnection == null || _DbConnection.isClosed()) {
-			_DbConnection = DriverManager.getConnection(_ConnStr, _Username, _Password);
+			_InitDatabase();
+			return;
 		}
-		if (!_DbConnection.isValid(5)) {
-			_DbConnection.close();
-			_DbConnection = DriverManager.getConnection(_ConnStr, _Username, _Password);
+		if (_Statement != null && !_Statement.isClosed())
+		{
+			_Statement.close();
 		}
-		if (_Statement == null || _Statement.isClosed()) {
-			_InsertSQL = "INSERT INTO `" + _Table + "` values (?,?,?,?,?,?,?,?)";
-			_Statement = _DbConnection.prepareStatement(_InsertSQL);
-		}
+		_DbConnection.close();
+		_InitDatabase();
+	}
+
+	private void _InitDatabase() throws SQLException {
+		_DbConnection = DriverManager.getConnection(_ConnStr, _Username, _Password);
+		/*设置事务处理*/
 		if (_DbConnection.getAutoCommit()) {
 			_DbConnection.setAutoCommit(false);
 		}
+		/*准备插入语句*/
+		_InsertSQL = "INSERT INTO `" + _Table + "` values (?,?,?,?,?,?,?,?)";
+		_Statement = _DbConnection.prepareStatement(_InsertSQL);
+
 	}
 
 	private void _WriteLogs(Queue<SingleLog> Logs) throws Exception {
@@ -190,6 +213,7 @@ public class LoggingDbAdaptor implements Runnable {
 				_Statement.close();
 			}
 		} catch (Exception e) {
+			Common.PrintException(e);
 		}
 	}
 }
