@@ -87,16 +87,22 @@ public class JSONSocketHandler extends Handler {
 	}
 	
 	private SocketDuplex _tcp;
+	
+	// 连接信息
+	private String _host;
+	private int _port;
 
 	public JSONSocketHandler() {
 	}
 
 	public JSONSocketHandler(String host, int port) {
 		_tcp = new SocketDuplexConn();
-		Result r = _tcp.Connect(host, port);
-		if (r.equals(Result.Error)) {
-			Common.PrintException(new Exception("连接日志出错，" + r.Message));
-		}
+		
+		// 等到发日志才连接，延迟连接
+		_host = host;
+		_port = port;
+		
+		// 设置formatter
 		setFormatter(new JSONFormatter());
 		try {
 			setEncoding("UTF-8");
@@ -112,6 +118,17 @@ public class JSONSocketHandler extends Handler {
 			return;
 		}
 		String msg = getFormatter().format(record);
+		
+		// 连接日志服务器
+		if (!_tcp.IsConnected()) {
+			Result r = _tcp.Connect(_host, _port);
+			if (r.equals(Result.Error)) {
+				Common.PrintException(new Exception("连接日志出错，" + r.Message + "，" + msg));
+				return;
+			}
+		}
+		
+		// 发送日志
 		Result r = _tcp.SendStream(msg.getBytes(Charset.forName(getEncoding())));
 		if (r.equals(Result.Error)) {
 			Common.PrintException(new Exception("发送日志出错，" + r.Message));

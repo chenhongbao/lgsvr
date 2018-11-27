@@ -1,6 +1,7 @@
 package dmkp.logging.svr;
 
 import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
@@ -29,7 +30,8 @@ public class LoggingServer extends SocketDuplex {
 	}
 	
 	@Override
-	public void OnConnect() {	
+	public void OnConnect() {
+		_LogSelf("Client connected");
 	}
 
 	@Override
@@ -45,6 +47,7 @@ public class LoggingServer extends SocketDuplex {
 
 	@Override
 	public void OnDisconnect() {
+		_LogSelf("Client disconnected");
 	}
 
 	@Override
@@ -56,6 +59,20 @@ public class LoggingServer extends SocketDuplex {
 	static {
 		_lock = new ReentrantReadWriteLock();
 		servers = new HashSet<LoggingServer>();
+	}
+	
+	private void _LogSelf(String msg) {
+		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
+		SingleLog log = new SingleLog();
+		log.TimeStamp = Common.GetTimestamp();
+		log.Level = "INFO";
+		log.LineNumber = 0;
+		log.LoggerName = "LoggerService";
+		log.Message = msg + ", " + addr.getHostString() + ":" + addr.getPort();
+		log.Millis = System.currentTimeMillis();
+		log.SourceClassName = "dmkp.logging.svr.LoggingServer";
+		log.SourceMethodName = "OnDisconnect";
+		_Adaptor.InsertLog(log);
 	}
 
 	public static void main(String[] args) {

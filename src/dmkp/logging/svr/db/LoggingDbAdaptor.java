@@ -25,7 +25,7 @@ public class LoggingDbAdaptor implements Runnable {
 		public String SourceMethodName = "";
 		public int LineNumber = -1;
 
-		SingleLog() {
+		public SingleLog() {
 		}
 		
 		/**
