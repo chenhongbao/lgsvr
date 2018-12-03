@@ -96,6 +96,9 @@ public class LoggingDbAdaptor implements Runnable {
 
 	@Override
 	public void run() {
+		// 设置线程名称，便于识别
+		Thread.currentThread().setName("Database deamon");
+		
 		_Stopped.set(false);
 		while (!_Stopped.get()) {
 			try {

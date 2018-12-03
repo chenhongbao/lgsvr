@@ -32,6 +32,10 @@ public class LoggingServer extends SocketDuplex {
 	@Override
 	public void OnConnect() {
 		_LogSelf("Client connected");
+		
+		// 设置线程名称
+		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
+		Thread.currentThread().setName("Client session (" + addr.getHostString() + ":" + addr.getPort() + ")");
 	}
 
 	@Override
