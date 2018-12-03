@@ -156,7 +156,15 @@ public class LoggingDbAdaptor implements Runnable {
 		{
 			_Statement.close();
 		}
-		_DbConnection.close();
+		if (_DbConnection.isValid(1)) {
+			_DbConnection.close();
+		}	
+		else
+		{
+			// 强行释放掉上次连接地引用，强迫JVM GC
+			_Statement = null;
+			_DbConnection = null;
+		}
 		_InitDatabase();
 	}
 
