@@ -148,23 +148,24 @@ public class LoggingDbAdaptor implements Runnable {
 	}
 	
 	private void _ResetDatabase() throws SQLException {
+		// 数据库未初始化
 		if (_DbConnection == null || _DbConnection.isClosed()) {
 			_InitDatabase();
 			return;
 		}
+		
+		// 重置连接
 		if (_Statement != null && !_Statement.isClosed())
 		{
 			_Statement.close();
 		}
 		if (_DbConnection.isValid(1)) {
 			_DbConnection.close();
-		}	
-		else
-		{
-			// 强行释放掉上次连接地引用，强迫JVM GC
-			_Statement = null;
-			_DbConnection = null;
 		}
+		
+		// 强行释放掉上次连接地引用，强迫JVM GC
+		_Statement = null;
+		_DbConnection = null;
 		_InitDatabase();
 	}
 
@@ -207,11 +208,20 @@ public class LoggingDbAdaptor implements Runnable {
 			if (++count % _QueryPerBatch == 0) {
 				_Statement.executeBatch();
 				_DbConnection.commit();
+				
+				// 计数清零
+				count = 0;
 			}
 		}
 		/* 执行剩下的语句 */
-		_Statement.executeBatch();
-		_DbConnection.commit();
+		if (count > 0) {
+			_Statement.executeBatch();
+			_DbConnection.commit();
+			count = 0;
+		}
+		
+		// 更新操作数据库的时间
+		_LastAccessDB = System.currentTimeMillis();
 	}
 
 	@Override
