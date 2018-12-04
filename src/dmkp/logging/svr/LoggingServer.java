@@ -31,10 +31,10 @@ public class LoggingServer extends SocketDuplex {
 	
 	@Override
 	public void OnConnect() {
-		_LogSelf("Client connected");
+		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
+		_LogSelf("Client connected, " + addr.getHostString() + ":" + addr.getPort(), _Adaptor);
 		
 		// 设置线程名称
-		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
 		Thread.currentThread().setName("Client session (" + addr.getHostString() + ":" + addr.getPort() + ")");
 	}
 
@@ -51,7 +51,8 @@ public class LoggingServer extends SocketDuplex {
 
 	@Override
 	public void OnDisconnect() {
-		_LogSelf("Client disconnected");
+		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
+		_LogSelf("Client disconnected, " + addr.getHostString() + ":" + addr.getPort(), _Adaptor);
 	}
 
 	@Override
@@ -65,18 +66,18 @@ public class LoggingServer extends SocketDuplex {
 		servers = new HashSet<LoggingServer>();
 	}
 	
-	private void _LogSelf(String msg) {
-		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
+	private static void _LogSelf(String msg, LoggingDbAdaptor adaptor) {
+		
 		SingleLog log = new SingleLog();
 		log.TimeStamp = Common.GetTimestamp();
 		log.Level = "INFO";
 		log.LineNumber = 0;
 		log.LoggerName = "LoggerService";
-		log.Message = msg + ", " + addr.getHostString() + ":" + addr.getPort();
+		log.Message = msg;
 		log.Millis = System.currentTimeMillis();
 		log.SourceClassName = "dmkp.logging.svr.LoggingServer";
 		log.SourceMethodName = "OnDisconnect";
-		_Adaptor.InsertLog(log);
+		adaptor.InsertLog(log);
 	}
 
 	public static void main(String[] args) {
@@ -84,8 +85,11 @@ public class LoggingServer extends SocketDuplex {
 		LoggingDbAdaptor adaptor = null;
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
-			InputStream is = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
-			JSONObject ob = Common.LoadJSONObject(is);
+			// IP配置
+			InputStream is0 = Class.forName(traces[1].getClassName()).getResource("ip.json").openStream();
+			// 监听端口
+			InputStream is1 = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
+			JSONObject ob = Common.LoadJSONObject(is1);
 			if (ob.has("Port")) {
 				port = ob.getInt("Port");
 			}
@@ -102,6 +106,16 @@ public class LoggingServer extends SocketDuplex {
 			while (true) {
 				/*接收连接*/
 				Socket client = ss.accept();
+				
+				// 判断远程IP地址是否被允许连接
+				InetSocketAddress addr = (InetSocketAddress)client.getRemoteSocketAddress();
+				String remoteIP = addr.getAddress().getHostAddress();
+				if (!Common.VerifyIP(remoteIP, is0)) {
+					_LogSelf("拒接连接，来自 " + remoteIP, adaptor);
+					continue;
+				}
+				
+				// 设置带外字节不接受
 				client.setOOBInline(false);
 				
 				/*同步*/
