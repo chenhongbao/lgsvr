@@ -124,6 +124,7 @@ public class LoggingServer extends SocketDuplex {
 				// 过滤IP
 				if (!Common.VerifyIP(remoteIP, is0)) {
 					_LogSelf("拒接连接，来自 " + remoteIP, adaptor);
+					client.close();
 					continue;
 				}
 				
