@@ -1,5 +1,6 @@
 package dmkp.logging.svr;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -83,10 +84,9 @@ public class LoggingServer extends SocketDuplex {
 	public static void main(String[] args) {
 		int port = DEFAULT_PORT;
 		LoggingDbAdaptor adaptor = null;
+		
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
-			// IP配置
-			InputStream is0 = Class.forName(traces[1].getClassName()).getResource("ip.json").openStream();
 			// 监听端口
 			InputStream is1 = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
 			JSONObject ob = Common.LoadJSONObject(is1);
@@ -103,6 +103,7 @@ public class LoggingServer extends SocketDuplex {
 			
 			/*监听端口*/
 			System.out.println("日志服务器启动，在端口" + port + "监听。");
+			
 			while (true) {
 				/*接收连接*/
 				Socket client = ss.accept();
@@ -110,6 +111,17 @@ public class LoggingServer extends SocketDuplex {
 				// 判断远程IP地址是否被允许连接
 				InetSocketAddress addr = (InetSocketAddress)client.getRemoteSocketAddress();
 				String remoteIP = addr.getAddress().getHostAddress();
+				
+				// IP配置文件
+				InputStream is0 = null;
+				try {
+					is0 = Class.forName(traces[1].getClassName()).getResource("ip.json").openStream();
+				}
+				catch (IOException ex) {
+					Common.PrintException(ex);
+				}
+				
+				// 过滤IP
 				if (!Common.VerifyIP(remoteIP, is0)) {
 					_LogSelf("拒接连接，来自 " + remoteIP, adaptor);
 					continue;
