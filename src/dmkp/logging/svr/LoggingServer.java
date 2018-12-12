@@ -15,7 +15,7 @@ import dmkp.common.net.SocketDuplex;
 import dmkp.common.util.Common;
 import dmkp.common.util.Result;
 import dmkp.logging.svr.db.LoggingDbAdaptor;
-import dmkp.logging.svr.db.LoggingDbAdaptor.SingleLog;
+import flyingbot.data.log.SingleLog;
 
 public class LoggingServer extends SocketDuplex {
 
@@ -43,7 +43,7 @@ public class LoggingServer extends SocketDuplex {
 	public void OnStream(byte[] Data) {
 		try {
 			String text = new String(Data, 0, Data.length, "UTF-8");
-			SingleLog log = LoggingDbAdaptor.SingleLog.CreateLog(text);
+			SingleLog log = LoggingDbAdaptor.CreateLog(text);
 			_Adaptor.InsertLog(log);
 		} catch (Exception e) {
 			Common.PrintException(e);

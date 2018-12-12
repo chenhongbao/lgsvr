@@ -12,47 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.json.JSONObject;
 
 import dmkp.common.util.Common;
+import flyingbot.data.log.SingleLog;
 
 public class LoggingDbAdaptor implements Runnable {
-
-	public static class SingleLog {
-		public String TimeStamp = "";
-		public String Level = "";
-		public String LoggerName = "";
-		public String Message = "";
-		public long Millis = -1;
-		public String SourceClassName = "";
-		public String SourceMethodName = "";
-		public int LineNumber = -1;
-
-		public SingleLog() {
-		}
-		
-		/**
-		 * 从JSON文本创建日志对象
-		 * @param text JSON文本
-		 * @return {@link SingleLog} 从JSON文本创建的对象
-		 */
-		public static SingleLog CreateLog(String text) {
-			SingleLog log = null;
-			try {
-				JSONObject obj = new JSONObject(text);
-				log = new SingleLog();
-				log.TimeStamp = obj.getString("TimeStamp");
-				log.Level = obj.getString("Level");
-				log.LoggerName = obj.getString("LoggerName");
-				log.Message = obj.getString("Message");
-				log.Millis = obj.getLong("Millis");
-				log.SourceClassName = obj.getString("SourceClassName");
-				log.SourceMethodName = obj.getString("SourceMethodName");
-				log.LineNumber = obj.getInt("LineNumber");
-				return log;
-			} catch (Exception e) {
-				Common.PrintException(e);
-				return log;
-			}
-		}
-	}
 
 	/*从资源文件JSON中读取数据库登陆信息*/
 	String _URL, _Username, _Password, _Table, _ConnStr, _InsertSQL;
@@ -82,6 +44,20 @@ public class LoggingDbAdaptor implements Runnable {
 		} catch (Exception e) {
 			Common.PrintException(e);
 		}
+	}
+	
+	/**
+	 * 从JSON文本创建日志对象
+	 * @param text JSON文本
+	 * @return {@link SingleLog} 从JSON文本创建的对象
+	 */
+	public static SingleLog CreateLog(String text) {
+		SingleLog log = SingleLog.Parse(new JSONObject(text));
+		if (log == null) {
+			Common.PrintException("Parsing log from JSON failed.");
+			log = new SingleLog();
+		}
+		return log;
 	}
 	
 	public static LoggingDbAdaptor CreateSingleton() {

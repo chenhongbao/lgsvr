@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>logsvr</name>
+	<name>logdb</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -18,7 +18,7 @@
 		<link>
 			<name>com_src</name>
 			<type>2</type>
-			<location>D:/Workspace/oepe/dmkp_common/src</location>
+			<location>D:/Workspace/oepe/com/src</location>
 		</link>
 	</linkedResources>
 </projectDescription>
