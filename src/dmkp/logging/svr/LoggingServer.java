@@ -102,8 +102,8 @@ public class LoggingServer extends SocketDuplex {
 			Common.GetSingletonExecSvc().execute(adaptor);
 			
 			/*监听端口*/
-			System.out.println("日志服务器启动，在端口" + port + "监听。");
-			_LogSelf("日志服务器启动，在端口" + port + "监听。", adaptor);
+			System.out.println("LOGDB is listening on port: " + port);
+			_LogSelf("LOGDB is listening on port: " + port, adaptor);
 			
 			while (true) {
 				/*接收连接*/
