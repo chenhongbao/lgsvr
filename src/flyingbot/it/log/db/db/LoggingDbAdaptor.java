@@ -1,6 +1,7 @@
 package flyingbot.it.log.db.db;
 
 import flyingbot.it.data.log.SingleLog;
+import flyingbot.it.log.db.resources.Constants;
 import flyingbot.it.util.Common;
 import org.json.JSONObject;
 
@@ -13,38 +14,59 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static flyingbot.it.log.db.resources.Constants.*;
+
 public class LoggingDbAdaptor implements Runnable {
+	/**
+	 * Singleton
+	 */
+	static LoggingDbAdaptor adaptor;
 
-	String _URL, _Username, _Password, _Table, _ConnStr, _InsertSQL;
-
-	Connection _DbConnection = null;
-	PreparedStatement _Statement = null;
-
-	AtomicBoolean _Stopped;
-
-	ConcurrentLinkedQueue<SingleLog> _LogQueue;
-
-	// do some inserts in a batch
-	public static long _QueryPerBatch = 500;
-	// singleton
-	static LoggingDbAdaptor _Adaptor;
-	public static long _ReconnectMillis = 1000 * 60 * 60;
-	// timestamp last access db
-	long _LastAccessDB = 0;
 	static {
 		try {
-			_Adaptor = new LoggingDbAdaptor();
+			adaptor = new LoggingDbAdaptor();
 		} catch (Exception e) {
 			Common.PrintException(e);
 		}
 	}
 
 	/**
+	 * Database info
+	 */
+	String URL, userName, password, tableName, connStr, insertSQL;
+	/**
+	 * Connection instance
+	 */
+	Connection dbConnection = null;
+	/**
+	 * SQL statment
+	 */
+	PreparedStatement statement = null;
+	/**
+	 * Mark if it is stopped
+	 */
+	AtomicBoolean isStopped;
+	/**
+	 * Logging queue
+	 */
+	ConcurrentLinkedQueue<SingleLog> logQueue;
+	/**
+	 * timestamp last access db
+	 */
+	long lastAccessDB = 0;
+
+	protected LoggingDbAdaptor() throws Exception {
+		isStopped = new AtomicBoolean(true);
+		logQueue = new ConcurrentLinkedQueue<SingleLog>();
+		loadConfiguration();
+	}
+	
+	/**
 	 * Parse logging from JSON text.
 	 * @param text JSON text
 	 * @return Log object
 	 */
-	public static SingleLog CreateLog(String text) {
+	public static SingleLog createLog(String text) {
 		SingleLog log = SingleLog.Parse(new JSONObject(text));
 		if (log == null) {
 			Common.PrintException("Parsing log from JSON failed.");
@@ -52,127 +74,120 @@ public class LoggingDbAdaptor implements Runnable {
 		}
 		return log;
 	}
-	
-	public static LoggingDbAdaptor CreateSingleton() {
-		return _Adaptor;
-	}
 
-	protected LoggingDbAdaptor() throws Exception {
-		_Stopped = new AtomicBoolean(true);
-		_LogQueue = new ConcurrentLinkedQueue<SingleLog>();
-		_LoadConfiguration();
+	public static LoggingDbAdaptor createSingleton() {
+		return adaptor;
 	}
 
 	@Override
 	public void run() {
 		Thread.currentThread().setName("Database deamon");
-		
-		_Stopped.set(false);
-		while (!_Stopped.get()) {
+
+		isStopped.set(false);
+		while (!isStopped.get()) {
 			try {
-				_WriteLogs(_LogQueue);
-				Thread.sleep(1000);
+				writeLogs(logQueue);
+				Thread.sleep(QueueScanMillis);
 			} catch (Exception e) {
 				Common.PrintException(e);
 			}
 		}
 	}
 
-	public void InsertLog(SingleLog Log) {
-		_LogQueue.add(Log);
+	public void insertLog(SingleLog Log) {
+		logQueue.add(Log);
 	}
 
-	public void Stop() {
-		_Stopped.set(true);
+	public void stop() {
+		isStopped.set(true);
 	}
 
-	public boolean IsStopped() {
-		return _Stopped.get();
+	public boolean isStopped() {
+		return isStopped.get();
 	}
 
-	private void _LoadConfiguration() throws Exception {
-		InputStream is = this.getClass().getResource("dblogin.json").openStream();
+	private void loadConfiguration() throws Exception {
+		InputStream is = Constants.class.getResource("dblogin.json").openStream();
 		JSONObject obj = Common.LoadJSONObject(is);
-		if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
-			_URL = obj.getString("URL");
-			_Username = obj.getString("Username");
-			_Password = obj.getString("Password");
-			_Table = obj.getString("Table");
-			_ConnStr = _URL
+		if (obj.has(ConfigTag_URL) && obj.has(ConfigTag_User) && obj.has(ConfigTag_Pwd)) {
+			URL = obj.getString(ConfigTag_URL);
+			userName = obj.getString(ConfigTag_User);
+			password = obj.getString(ConfigTag_Pwd);
+			tableName = obj.getString(ConfigTag_Table);
+			connStr = URL
 					+ "?characterEncoding=utf8&useSSL=false"
 					+ "&serverTimezone=UTC&rewriteBatchedStatements=true";
 		}
 		Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
 	}
-	
-	private void _ConnectDatabase() throws SQLException {
+
+	private void connectDatabase() throws SQLException {
 		long cur = System.currentTimeMillis();
-		if (cur - _LastAccessDB > _ReconnectMillis) {
-			_ResetDatabase();
-			_LastAccessDB = cur;
+		if (cur - lastAccessDB > reconnectMillis) {
+			resetDatabase();
+			lastAccessDB = cur;
 			return;
 		}
 	}
-	
-	private void _ResetDatabase() throws SQLException {
-		if (_DbConnection == null || _DbConnection.isClosed()) {
-			_InitDatabase();
+
+	private void resetDatabase() throws SQLException {
+		if (dbConnection == null || dbConnection.isClosed()) {
+			initDatabase();
 			return;
 		}
 
-		if (_Statement != null && !_Statement.isClosed())
-		{
-			_Statement.close();
+		if (statement != null && !statement.isClosed()) {
+			statement.close();
 		}
-		if (_DbConnection.isValid(1)) {
-			_DbConnection.close();
+		if (dbConnection.isValid(1)) {
+			dbConnection.close();
 		}
 
-		_Statement = null;
-		_DbConnection = null;
-		_InitDatabase();
+		statement = null;
+		dbConnection = null;
+		initDatabase();
 	}
 
-	private void _InitDatabase() throws SQLException {
-		_DbConnection = DriverManager.getConnection(_ConnStr, _Username, _Password);
+	private void initDatabase() throws SQLException {
+		dbConnection = DriverManager.getConnection(connStr, userName, password);
 
 		// turn off auto-commit
-		if (_DbConnection.getAutoCommit()) {
-			_DbConnection.setAutoCommit(false);
+		if (dbConnection.getAutoCommit()) {
+			dbConnection.setAutoCommit(false);
 		}
 
 		// build sql string
-		_InsertSQL = "INSERT INTO `" + _Table + "` values (?,?,?,?,?,?,?,?)";
-		_Statement = _DbConnection.prepareStatement(_InsertSQL);
+		insertSQL = "INSERT INTO `" + tableName + "` values (?,?,?,?,?,?,?,?)";
+		statement = dbConnection.prepareStatement(insertSQL);
 
 	}
 
-	private void _WriteLogs(Queue<SingleLog> Logs) throws Exception {
+	private void writeLogs(Queue<SingleLog> Logs) throws Exception {
 		long count = 0;
 		if (Logs.size() < 1) {
 			return;
 		}
-		_ConnectDatabase();
+		connectDatabase();
 		
 		while (Logs.size() > 0) {
 			SingleLog log = Logs.poll();
 			if (log == null) {
 				continue;
 			}
-			_Statement.setString(1,  log.TimeStamp);
-			_Statement.setString(2, log.Level);
-			_Statement.setString(3, log.LoggerName);
-			_Statement.setString(4, log.Message);
-			_Statement.setLong(5, log.Millis);
-			_Statement.setString(6, log.SourceClassName);
-			_Statement.setString(7, log.SourceMethodName);
-			_Statement.setInt(8, log.LineNumber);
-			_Statement.addBatch();
+			statement.setString(1, log.TimeStamp);
+			statement.setString(2, log.Level);
+			statement.setString(3, log.LoggerName);
+			statement.setString(4, log.Message);
+			statement.setLong(5, log.Millis);
+			statement.setString(6, log.SourceClassName);
+			statement.setString(7, log.SourceMethodName);
+			statement.setInt(8, log.LineNumber);
+			statement.addBatch();
 
 			// some inserts at a time
-			if (++count % _QueryPerBatch == 0) {
-				_Statement.executeBatch();
-				_DbConnection.commit();
+			if (++count % queryPerBatch == 0) {
+				statement.executeBatch();
+				dbConnection.commit();
 
 				// reset counter
 				count = 0;
@@ -181,23 +196,23 @@ public class LoggingDbAdaptor implements Runnable {
 
 		// process the remaining inserts
 		if (count > 0) {
-			_Statement.executeBatch();
-			_DbConnection.commit();
+			statement.executeBatch();
+			dbConnection.commit();
 			count = 0;
 		}
 
 		// update timestamp
-		_LastAccessDB = System.currentTimeMillis();
+		lastAccessDB = System.currentTimeMillis();
 	}
 
 	@Override
 	protected void finalize() {
 		try {
-			if (!_DbConnection.isClosed()) {
-				_DbConnection.close();
+			if (!dbConnection.isClosed()) {
+				dbConnection.close();
 			}
-			if (!_Statement.isClosed()) {
-				_Statement.close();
+			if (!statement.isClosed()) {
+				statement.close();
 			}
 		} catch (Exception e) {
 			Common.PrintException(e);

@@ -2,12 +2,14 @@ package flyingbot.it.log.db;
 
 import flyingbot.it.data.log.SingleLog;
 import flyingbot.it.log.db.db.LoggingDbAdaptor;
+import flyingbot.it.log.db.resources.Constants;
+import flyingbot.it.log.db.ws.LogSubscriber;
+import flyingbot.it.log.db.ws.WsLogServer;
 import flyingbot.it.net.tcp.SocketDuplex;
 import flyingbot.it.util.Common;
 import flyingbot.it.util.Result;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -16,46 +18,52 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static flyingbot.it.log.db.resources.Constants.*;
+
 public class LoggingServer extends SocketDuplex {
+	static ReentrantReadWriteLock rwLock;
 
-	LoggingDbAdaptor _Adaptor;
-
-	public static int DEFAULT_PORT = 9201;
-
-	public LoggingServer(Socket Sock, LoggingDbAdaptor Adaptor) {
-		super(Sock);
-		_Adaptor = Adaptor;
+	static {
+		rwLock = new ReentrantReadWriteLock();
+		servers = new HashSet<LoggingServer>();
 	}
 
-	private static void _LogSelf(String msg, LoggingDbAdaptor adaptor) {
+	/**
+	 * Adaptor for writing logs to database
+	 */
+	LoggingDbAdaptor adaptor;
+	/**
+	 * Observers listening on WS
+	 */
+	LogSubscriber subscriber;
 
+	public LoggingServer(Socket Sock, LoggingDbAdaptor Adaptor, LogSubscriber subs) {
+		super(Sock);
+		this.adaptor = Adaptor;
+		this.subscriber = subs;
+	}
+
+	public static void info(String msg) {
+		thisLog("INFO", msg);
+	}
+
+	public static void warn(String msg) {
+		thisLog("WARNING", msg);
+	}
+
+	static void thisLog(String level, String msg) {
 		SingleLog log = new SingleLog();
 		log.TimeStamp = Common.GetTimestamp();
-		log.Level = "INFO";
+		log.Level = level;
 		log.LineNumber = 0;
 		log.LoggerName = "LoggerService";
 		log.Message = msg;
 		log.Millis = System.currentTimeMillis();
 		log.SourceClassName = "LoggingServer";
 		log.SourceMethodName = "OnDisconnect";
-		adaptor.InsertLog(log);
-	}
 
-	@Override
-	public void OnStream(byte[] Data) {
-		try {
-			String text = new String(Data, 0, Data.length, "UTF-8");
-			SingleLog log = LoggingDbAdaptor.CreateLog(text);
-			_Adaptor.InsertLog(log);
-		} catch (Exception e) {
-			Common.PrintException(e);
-		}	
-	}
-
-	@Override
-	public void OnDisconnect() {
-		InetSocketAddress addr = (InetSocketAddress)this.GetSocketAddress();
-		_LogSelf("Client disconnected, " + addr.getHostString() + ":" + addr.getPort(), _Adaptor);
+		// insert
+		LoggingDbAdaptor.createSingleton().insertLog(log);
 	}
 
 	@Override
@@ -63,34 +71,67 @@ public class LoggingServer extends SocketDuplex {
 	}
 	
 	static Set<LoggingServer> servers;
-	static ReentrantReadWriteLock _lock;
-	static {
-		_lock = new ReentrantReadWriteLock();
-		servers = new HashSet<LoggingServer>();
-	}
-	
+
 	public static void main(String[] args) {
-		int port = DEFAULT_PORT;
-		LoggingDbAdaptor adaptor = null;
+		int clientPort = InsideListenPort;
+		int observerPort = ObserverListenPort;
+
+		// Write log to DB
+		final LoggingDbAdaptor adaptor = LoggingDbAdaptor.createSingleton();
+
+		// Subscribers
+		final LogSubscriber subs = LogSubscriber.singleton();
+
+		// Serve observers via WebSocket
+		final WsLogServer wsSvr = WsLogServer.createInstance(observerPort, subs);
 
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
 
-			InputStream is1 = Class.forName(traces[1].getClassName()).getResource("port.json").openStream();
+			// Get port for clients
+			InputStream is1 = Constants.class.getResource("port.json").openStream();
 			JSONObject ob = Common.LoadJSONObject(is1);
-			if (ob.has("Port")) {
-				port = ob.getInt("Port");
+			if (ob.has(ConfigTag_Port)) {
+				clientPort = ob.getInt(ConfigTag_Port);
+			}
+
+			// Get port for observers
+			is1 = Constants.class.getResource("ws_port.json").openStream();
+			ob = Common.LoadJSONObject(is1);
+			if (ob.has(ConfigTag_Port)) {
+				clientPort = ob.getInt(ConfigTag_Port);
 			}
 
 			@SuppressWarnings("resource")
-			ServerSocket ss = new ServerSocket(port);
+			ServerSocket ss = new ServerSocket(clientPort);
 
-			// get singleton adaptor
-			adaptor = LoggingDbAdaptor.CreateSingleton();
+			// Start deamon for writing log to BD
 			Common.GetSingletonExecSvc().execute(adaptor);
 
-			System.out.println("LOGDB is listening on port: " + port);
-			_LogSelf("LOGDB is listening on port: " + port, adaptor);
+			// Start WS server for observers
+			Common.GetSingletonExecSvc().execute(wsSvr);
+
+			// Heartbeat deamon
+			Common.GetSingletonExecSvc().execute(new Runnable() {
+
+				@Override
+				public void run() {
+					while (true) {
+						try {
+							// prime number
+							Thread.sleep(WsHeartbeat_Intvl);
+						} catch (InterruptedException e) {
+						}
+
+						// Send heartbeats
+						subs.sendHeartbeat(HeartbeatMsg);
+					}
+				}
+
+			});
+
+			System.out.println("LOGDB is listening on port: " + clientPort);
+			info("LOGDB is listening on port: " + clientPort);
 
 			while (true) {
 				Socket client = ss.accept();
@@ -101,15 +142,14 @@ public class LoggingServer extends SocketDuplex {
 
 				InputStream is0 = null;
 				try {
-					is0 = Class.forName(traces[1].getClassName()).getResource("ip.json").openStream();
-				}
-				catch (IOException ex) {
+					is0 = Constants.class.getResourceAsStream("ip.json");
+				} catch (Exception ex) {
 					Common.PrintException(ex);
 				}
 
 				// validate IP
 				if (!Common.VerifyIP(remoteIP, is0)) {
-					_LogSelf("Invalid remote IP: " + remoteIP, adaptor);
+					info("Invalid remote IP: " + remoteIP);
 					client.close();
 					continue;
 				}
@@ -118,24 +158,24 @@ public class LoggingServer extends SocketDuplex {
 				client.setOOBInline(false);
 
 				// add logging service instance
-				_lock.writeLock().lock();
-				servers.add(new LoggingServer(client, adaptor));
-				_lock.writeLock().unlock();
+				rwLock.writeLock().lock();
+				servers.add(new LoggingServer(client, adaptor, subs));
+				rwLock.writeLock().unlock();
 
 				// remove dead service
 				Set<LoggingServer> tmp = new HashSet<LoggingServer>();
-				_lock.readLock().lock();
+				rwLock.readLock().lock();
 				for (LoggingServer s : servers) {
 					if (!s.IsConnected()) {
 						tmp.add(s);
 					}
 				}
-				_lock.readLock().unlock();
-				_lock.writeLock().lock();
+				rwLock.readLock().unlock();
+				rwLock.writeLock().lock();
 				for (LoggingServer s : tmp) {
 					servers.remove(s);
 				}
-				_lock.writeLock().unlock();
+				rwLock.writeLock().unlock();
 			}
 		} catch (Exception e) {
 			Common.PrintException(e);
@@ -143,9 +183,31 @@ public class LoggingServer extends SocketDuplex {
 	}
 
 	@Override
+	public void OnStream(byte[] Data) {
+		try {
+			String text = new String(Data, 0, Data.length, DefaultCharset);
+			SingleLog log = LoggingDbAdaptor.createLog(text);
+
+			// Write log to DB
+			adaptor.insertLog(log);
+
+			// Send log to observers
+			subscriber.distributeLog(log);
+		} catch (Exception e) {
+			Common.PrintException(e);
+		}
+	}
+
+	@Override
+	public void OnDisconnect() {
+		InetSocketAddress addr = (InetSocketAddress) this.GetSocketAddress();
+		info("Client disconnected, " + addr.getHostString() + ":" + addr.getPort());
+	}
+
+	@Override
 	public void OnConnect() {
 		InetSocketAddress addr = (InetSocketAddress) this.GetSocketAddress();
-		_LogSelf("Client connected, " + addr.getHostString() + ":" + addr.getPort(), _Adaptor);
+		info("Client connected, " + addr.getHostString() + ":" + addr.getPort());
 
 		Thread.currentThread().setName("Client session (" + addr.getHostString() + ":" + addr.getPort() + ")");
 	}
