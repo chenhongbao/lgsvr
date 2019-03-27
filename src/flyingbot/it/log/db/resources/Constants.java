@@ -55,4 +55,7 @@ public class Constants {
 
     // HTTP max content
     public final static int HTTP_MaxContentLength = 64 * 1024;
+
+    // Max log cache
+    public final static int CacheLogMaxnum = 100;
 }

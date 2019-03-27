@@ -8,10 +8,15 @@ import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static flyingbot.it.log.db.resources.Constants.CacheLogMaxnum;
 import static flyingbot.it.log.db.resources.Constants.QueueScanMillis;
 
 public class LogSubscriber {
@@ -30,18 +35,22 @@ public class LogSubscriber {
      * Subscription channels
      */
     ConcurrentHashMap<String, ChannelGroup> matchSubscription, likeSubscription;
-    ReentrantLock mwrLock, lwrLock;
+
     /**
      * Logs to be sent to observers
      */
     ConcurrentLinkedQueue<SingleLog> logQueue;
 
+    /**
+     * Cache log
+     */
+    LogCache cache;
+
     LogSubscriber() {
         matchSubscription = new ConcurrentHashMap<>();
         likeSubscription = new ConcurrentHashMap<>();
         logQueue = new ConcurrentLinkedQueue<>();
-        mwrLock = new ReentrantLock();
-        lwrLock = new ReentrantLock();
+        cache = new LogCache();
 
         /**
          * Broadcast deamon
@@ -69,17 +78,69 @@ public class LogSubscriber {
         });
     }
 
+    public void distributeLog(SingleLog log) {
+        logQueue.add(log);
+        cache.cacheLog(log);
+    }
+
     public static LogSubscriber singleton() {
         return singletonObj;
     }
 
-    public void distributeLog(SingleLog log) {
-        logQueue.add(log);
+    public void subscribeLogger(Channel ch, String logger, SubscriptionType type) {
+        switch (type) {
+            case MATCH:
+                // Send old logs
+                List<SingleLog> l = cache.queryLog(logger);
+                if (l != null && l.size() > 0) {
+                    for (SingleLog sl : l) {
+                        try {
+                            ch.writeAndFlush(sl.ToJSON().toString(-1));
+                        } catch (Exception ex) {
+                            LoggingServer.warn("Send log failed, " + ex.getMessage());
+                        }
+                    }
+                }
+
+                // Add to channel group
+                addChannel(ch, logger, matchSubscription);
+                break;
+            case LIKE:
+                // Send old logs
+                Set<SingleLog> ret = new TreeSet<>();
+                for (String k : cache.keys()) {
+                    if (k.indexOf(logger) == -1) {
+                        continue;
+                    }
+
+                    l = cache.queryLog(k);
+                    if (l == null || l.size() < 1) {
+                        continue;
+                    }
+
+                    // Insert log into a sorted set
+                    for (SingleLog sl : l) {
+                        ret.add(sl);
+                    }
+                }
+
+                for (SingleLog sl : ret) {
+                    try {
+                        ch.writeAndFlush(sl.ToJSON().toString(-1));
+                    } catch (Exception ex) {
+                        LoggingServer.warn("Send log failed, " + ex.getMessage());
+                    }
+                }
+
+                // Add to channel group
+                addChannel(ch, logger, likeSubscription);
+                break;
+            default:
+                break;
+        }
     }
 
     void broadcastLog(SingleLog log) {
-        mwrLock.lock();
-
         if (matchSubscription.containsKey(log.LoggerName)) {
             try {
                 matchSubscription.get(log.LoggerName).writeAndFlush(log.ToJSON().toString(-1));
@@ -87,10 +148,6 @@ public class LogSubscriber {
                 LoggingServer.warn("Send log(" + log.LoggerName + ") to observer failed, " + ex.getMessage());
             }
         }
-
-        mwrLock.unlock();
-
-        lwrLock.lock();
 
         for (String k : likeSubscription.keySet()) {
             if (log.LoggerName.indexOf(k) == -1) {
@@ -103,62 +160,19 @@ public class LogSubscriber {
                 LoggingServer.warn("Send log(" + log.LoggerName + ") to observer failed, " + ex.getMessage());
             }
         }
-
-        lwrLock.unlock();
-    }
-
-    public void subscribeLogger(Channel ch, String logger, SubscriptionType type) {
-        switch (type) {
-            case MATCH:
-                addChannel(ch, logger, mwrLock, matchSubscription);
-                break;
-            case LIKE:
-                addChannel(ch, logger, lwrLock, likeSubscription);
-                break;
-            default:
-                break;
-        }
     }
 
     public boolean unsubscribeLogger(Channel ch, String logger) {
-        return removeChannel(ch, logger, mwrLock, matchSubscription)
-                || removeChannel(ch, logger, lwrLock, likeSubscription);
+        return removeChannel(ch, logger, matchSubscription)
+                || removeChannel(ch, logger, likeSubscription);
     }
 
     public void sendHeartbeat(String payload) {
-        sendHeartbeatGroup(payload, mwrLock, matchSubscription);
-        sendHeartbeatGroup(payload, lwrLock, likeSubscription);
+        sendHeartbeatGroup(payload, matchSubscription);
+        sendHeartbeatGroup(payload, likeSubscription);
     }
 
-    public void closeAllChannels() {
-        mwrLock.lock();
-
-        for (ChannelGroup g : matchSubscription.values()) {
-            try {
-                g.close();
-            } catch (Exception ex) {
-                LoggingServer.warn("Close channels failed, " + ex.getMessage());
-            }
-        }
-
-        mwrLock.unlock();
-
-        lwrLock.lock();
-
-        for (ChannelGroup g : likeSubscription.values()) {
-            try {
-                g.close();
-            } catch (Exception ex) {
-                LoggingServer.warn("Close channels failed, " + ex.getMessage());
-            }
-        }
-
-        lwrLock.unlock();
-    }
-
-    void sendHeartbeatGroup(String payload, ReentrantLock lock, ConcurrentHashMap<String, ChannelGroup> group) {
-        lock.lock();
-
+    void sendHeartbeatGroup(String payload, ConcurrentHashMap<String, ChannelGroup> group) {
         for (ChannelGroup g : group.values()) {
             if (g == null) {
                 continue;
@@ -170,32 +184,82 @@ public class LogSubscriber {
                 LoggingServer.warn(ex.getMessage());
             }
         }
-
-        lock.unlock();
     }
 
-    void addChannel(Channel ch, String logger, ReentrantLock lock, ConcurrentHashMap<String, ChannelGroup> group) {
-        lock.lock();
+    public void closeAllChannels() {
+        for (ChannelGroup g : matchSubscription.values()) {
+            try {
+                g.close();
+            } catch (Exception ex) {
+                LoggingServer.warn("Close channels failed, " + ex.getMessage());
+            }
+        }
 
+        for (ChannelGroup g : likeSubscription.values()) {
+            try {
+                g.close();
+            } catch (Exception ex) {
+                LoggingServer.warn("Close channels failed, " + ex.getMessage());
+            }
+        }
+    }
+
+    void addChannel(Channel ch, String logger, ConcurrentHashMap<String, ChannelGroup> group) {
         if (!group.containsKey(logger)) {
             group.put(logger, new DefaultChannelGroup(ImmediateEventExecutor.INSTANCE));
         }
 
         group.get(logger).add(ch);
-
-        lock.unlock();
     }
 
-    boolean removeChannel(Channel ch, String logger, ReentrantLock lock, ConcurrentHashMap<String, ChannelGroup> group) {
+    boolean removeChannel(Channel ch, String logger, ConcurrentHashMap<String, ChannelGroup> group) {
         boolean ret = false;
-        lock.lock();
 
         if (group.containsKey(logger)) {
             ret = group.get(logger).remove(ch);
         }
 
-        lock.unlock();
         return ret;
+    }
+
+    class LogCache {
+        /**
+         * Log cache
+         */
+        ConcurrentHashMap<String, ConcurrentLinkedQueue<SingleLog>> cache;
+
+        public LogCache() {
+            cache = new ConcurrentHashMap<>();
+        }
+
+        public Set<String> keys() {
+            return cache.keySet();
+        }
+
+        public void cacheLog(SingleLog log) {
+            if (!cache.containsKey(log.LoggerName)) {
+                cache.put(log.LoggerName, new ConcurrentLinkedQueue<>());
+            }
+
+            // limit the size
+            ConcurrentLinkedQueue<SingleLog> rec = cache.get(log.LoggerName);
+            while (rec.size() > CacheLogMaxnum) {
+                rec.poll();
+            }
+
+            // add to end
+            rec.add(log);
+        }
+
+        public List<SingleLog> queryLog(String logger) {
+            if (!cache.containsKey(logger)) {
+                return null;
+            }
+
+            List<SingleLog> ret = new ArrayList<>();
+            ret.addAll(cache.get(logger));
+            return ret;
+        }
     }
 
     /**
