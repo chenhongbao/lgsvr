@@ -6,6 +6,7 @@ import flyingbot.it.util.Common;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 
 import java.util.ArrayList;
@@ -143,7 +144,10 @@ public class LogSubscriber {
     void broadcastLog(SingleLog log) {
         if (matchSubscription.containsKey(log.LoggerName)) {
             try {
-                matchSubscription.get(log.LoggerName).writeAndFlush(log.ToJSON().toString(-1));
+                ChannelGroup g = matchSubscription.get(log.LoggerName);
+                if (g != null) {
+                    g.writeAndFlush(new TextWebSocketFrame(log.ToJSON().toString(-1)));
+                }
             } catch (Exception ex) {
                 LoggingServer.warn("Send log(" + log.LoggerName + ") to observer failed, " + ex.getMessage());
             }
@@ -155,7 +159,10 @@ public class LogSubscriber {
             }
 
             try {
-                likeSubscription.get(k).writeAndFlush(log.ToJSON().toString(-1));
+                ChannelGroup g = likeSubscription.get(k);
+                if (g != null) {
+                    g.writeAndFlush(new TextWebSocketFrame(log.ToJSON().toString(-1)));
+                }
             } catch (Exception ex) {
                 LoggingServer.warn("Send log(" + log.LoggerName + ") to observer failed, " + ex.getMessage());
             }

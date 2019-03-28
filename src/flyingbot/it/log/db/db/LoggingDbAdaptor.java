@@ -75,7 +75,7 @@ public class LoggingDbAdaptor implements Runnable {
 		return log;
 	}
 
-	public static LoggingDbAdaptor createSingleton() {
+    public static LoggingDbAdaptor singleton() {
 		return adaptor;
 	}
 

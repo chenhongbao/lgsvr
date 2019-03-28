@@ -62,8 +62,9 @@ public class LoggingServer extends SocketDuplex {
 		log.SourceClassName = "LoggingServer";
 		log.SourceMethodName = "OnDisconnect";
 
-		// insert
-		LoggingDbAdaptor.createSingleton().insertLog(log);
+        // insert and broadcast to observers
+        LoggingDbAdaptor.singleton().insertLog(log);
+        LogSubscriber.singleton().distributeLog(log);
 	}
 
 	@Override
@@ -77,13 +78,13 @@ public class LoggingServer extends SocketDuplex {
 		int observerPort = ObserverListenPort;
 
 		// Write log to DB
-		final LoggingDbAdaptor adaptor = LoggingDbAdaptor.createSingleton();
+        final LoggingDbAdaptor adaptor = LoggingDbAdaptor.singleton();
 
 		// Subscribers
 		final LogSubscriber subs = LogSubscriber.singleton();
 
 		// Serve observers via WebSocket
-		final WsLogServer wsSvr = WsLogServer.createInstance(observerPort, subs);
+        final WsLogServer wsSvr = WsLogServer.instance(observerPort, subs);
 
 		try {
 			StackTraceElement[] traces = Thread.currentThread().getStackTrace();
@@ -99,7 +100,7 @@ public class LoggingServer extends SocketDuplex {
 			is1 = Constants.class.getResource("ws_port.json").openStream();
 			ob = Common.LoadJSONObject(is1);
 			if (ob.has(ConfigTag_Port)) {
-				clientPort = ob.getInt(ConfigTag_Port);
+                observerPort = ob.getInt(ConfigTag_Port);
 			}
 
 			@SuppressWarnings("resource")
@@ -130,7 +131,6 @@ public class LoggingServer extends SocketDuplex {
 
 			});
 
-			System.out.println("LOGDB is listening on port: " + clientPort);
 			info("LOGDB is listening on port: " + clientPort);
 
 			while (true) {

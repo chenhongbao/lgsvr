@@ -53,7 +53,7 @@ public class WsLogServer implements Runnable {
         }
     }
 
-    public static WsLogServer createInstance(int port, LogSubscriber subs) {
+    public static WsLogServer instance(int port, LogSubscriber subs) {
         return new WsLogServer(port, subs);
     }
 
@@ -63,7 +63,7 @@ public class WsLogServer implements Runnable {
         LoggingServer.info("LOGDB WebSocket server is listening on port: " + port);
 
         // Create server instance
-        final WsLogServer endpoint = WsLogServer.createInstance(port, subscriber);
+        final WsLogServer endpoint = WsLogServer.instance(port, subscriber);
         ChannelFuture future = endpoint.start(new InetSocketAddress(port));
 
         // Setup destroy
