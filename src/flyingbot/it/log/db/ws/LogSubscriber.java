@@ -223,7 +223,17 @@ public class LogSubscriber {
         boolean ret = false;
 
         if (group.containsKey(logger)) {
-            ret = group.get(logger).remove(ch);
+            ChannelGroup g = group.get(logger);
+            ret = g.remove(ch);
+
+            //
+            // Remove the entry if the channel group has no member.
+            // Consider when the log db server runs for a long time,
+            // the obsolete subscription may reside in the map, cost a lot of memory.
+            //
+            if (g.size() < 1) {
+                group.remove(logger);
+            }
         }
 
         return ret;
