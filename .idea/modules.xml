@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/logdb.iml" filepath="$PROJECT_DIR$/.idea/logdb.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../base/base.iml" filepath="$PROJECT_DIR$/../base/base.iml" />
+      <module fileurl="file://$PROJECT_DIR$/logdb.iml" filepath="$PROJECT_DIR$/logdb.iml" />
     </modules>
   </component>
 </project>
