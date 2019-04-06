@@ -12,6 +12,6 @@ CREATE TABLE log_ws_01 (
     `SourceMethodName` CHAR(255) NOT NULL COMMENT 'Method that sent the log',
     `LineNumber` INT NOT NULL COMMENT 'Line number of code generating the log',
     KEY (`Millis`),
-    KEY (`SourceClassName`),
-    KEY (`SourceMethodName`)
+    KEY (`Level`),
+    KEY (`LoggerName`)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
