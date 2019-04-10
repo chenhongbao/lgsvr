@@ -21,7 +21,7 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequ
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         // Process websocket prefix
         String reqUri = request.uri();
-        LoggingServer.warn("Client connected, " + ctx.channel() + ", URI: " + reqUri);
+        LoggingServer.info("Client connected, " + ctx.channel() + ", URI: " + reqUri);
 
         // Check if client requests the right resource
         if (reqUri.startsWith(wsURI)) {
