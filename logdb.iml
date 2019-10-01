@@ -7,9 +7,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="lib" level="project" />
     <orderEntry type="module" module-name="base" exported="" />
-    <orderEntry type="library" exported="" name="mysql-connector-java-8.0.12" level="project" />
-    <orderEntry type="library" name="netty-all-4.1.30.Final" level="project" />
-    <orderEntry type="library" name="tyrus-standalone-client-1.15" level="project" />
   </component>
 </module>

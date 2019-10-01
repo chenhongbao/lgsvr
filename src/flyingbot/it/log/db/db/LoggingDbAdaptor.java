@@ -115,7 +115,7 @@ public class LoggingDbAdaptor implements Runnable {
 			password = obj.getString(ConfigTag_Pwd);
 			tableName = obj.getString(ConfigTag_Table);
 			connStr = URL
-					+ "?characterEncoding=utf8&useSSL=false"
+					+ "?characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true"
 					+ "&serverTimezone=UTC&rewriteBatchedStatements=true";
 		}
 		Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
